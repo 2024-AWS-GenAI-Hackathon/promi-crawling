@@ -1,5 +1,6 @@
 # 추가
 myenv/
+*.xlsx
 
 
 # Byte-compiled / optimized / DLL files
