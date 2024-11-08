@@ -11,12 +11,17 @@ from bs4 import BeautifulSoup
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+naver_css = {
+    'review_li': 'li.pui__X35jYm.EjjAW',
+    'category_fold_a': 'a[data-pui-click-code="keywordmore"]',
+    'load_more_XPATH': '//*[@id="app-root"]/div/div/div/div[6]/div[2]/div[3]/div[2]/div/a'
+}
+
 # URL
 url = 'https://m.place.naver.com/restaurant/1085956231/review/visitor?entry=ple&reviewSort=recent'
 
 # Webdriver headless mode 설정
 options = webdriver.ChromeOptions()
-# options.add_argument('headless')  # 필요시 headless 모드 활성화
 options.add_argument('window-size=1920x1080')
 options.add_argument("disable-gpu")
 
@@ -32,10 +37,9 @@ try:
 
     # 페이지 다운
     driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
-
     try:
-        for i in range(30):  # 최대 30번 반복
-            element = driver.find_element(By.XPATH, '//*[@id="app-root"]/div/div/div/div[6]/div[2]/div[3]/div[1]/ul/li[2]/div[5]/a')
+        for i in range(15):
+            element = driver.find_element(By.XPATH, naver_css['load_more_XPATH'])
             driver.execute_script("arguments[0].scrollIntoView(true);", element)
             time.sleep(1)  # 페이지가 완전히 로드되었는지 기다림
             element.click()
@@ -47,11 +51,12 @@ try:
     time.sleep(25)
     html = driver.page_source
     bs = BeautifulSoup(html, 'lxml')
-    reviews = bs.select('li.pui__X35jYm.EjjAW')
+    reviews = bs.select(naver_css['review_li'])
 
-    # 여러 개의 category fold 버튼을 찾음
-    category_fold_btns = driver.find_elements(By.CSS_SELECTOR, 'a[data-pui-click-code="keywordmore"]')
-    # 각 버튼을 클릭하는 액션 수행
+
+    # 카테고리 열기
+    category_fold_btns = driver.find_elements(By.CSS_SELECTOR, naver_css['category_fold_a'])
+    print("카테고리 열기 시작...")
     for button in category_fold_btns:
         try:
             # 버튼이 화면에 보이도록
@@ -60,16 +65,15 @@ try:
 
             #(JavaScript로 클릭)
             driver.execute_script("arguments[0].click();", button)
-            print("카테고리 클릭 성공")
-            time.sleep(1)  
+            time.sleep(1)
 
         except Exception as e:
             print(f"클릭 실패: {e}")
+    print("카테고리 열기 끝")
+
 
     content_id = 1  # content_id 초기값 설정
     reviews_list = []  # 리뷰 데이터 저장 리스트
-
-
     for r in reviews:
         # content
         content = r.select_one('div.pui__vn15t2 > a.pui__xtsQN-')
@@ -80,6 +84,7 @@ try:
 
         # category
         category_span_elements = r.select('span.pui__jhpEyP')
+        print(category_span_elements)
 
         # 예외 처리
         content = content.text if content else ''
@@ -108,6 +113,7 @@ try:
         review_data = {
             "content_id": content_id,
             "content": content,
+
             "posting_time": posting_time_str,  # 날짜를 문자열로 변환하여 저장
             "categories": categories  # 카테고리 리스트 추가
         }
