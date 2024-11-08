@@ -1,6 +1,7 @@
 # 추가
 myenv/
 *.xlsx
+*.json
 
 
 # Byte-compiled / optimized / DLL files
