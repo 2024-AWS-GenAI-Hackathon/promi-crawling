@@ -18,6 +18,65 @@ naver_css = {
     'category_XPATH' : '//*[@id="app-root"]/div/div/div/div[6]/div[2]/div[3]/div[1]/ul/li/div[5]/span'
 
 }
+# 카테고리 대분류 
+CATEGORY_CHOICE = {
+    "food": [
+        "음식이 맛있어요",
+        "재료가 신선해요",
+        "양이 많아요",
+        "특별한 메뉴가 있어요",
+        "가성비가 좋아요",
+        "건강한 맛이에요",
+        "반찬이 잘 나와요",
+        "메뉴 구성이 알차요",
+        "비싼 만큼 가치있어요",
+        "기본 안주가 좋아요",
+        "술이 다양해요",
+        "음료가 맛있어요",
+        "커피가 맛있어요",
+        "디저트가 맛있어요",
+        "코스요리가 알차요",
+        "고기 질이 좋아요",
+        "현지 맛에 가까워요",
+        "향신료가 강하지 않아요",
+        "잡내가 적어요"
+    ],
+    "vibe": [
+        "인테리어가 멋져요",
+        "매장이 넓어요",
+        "뷰가 좋아요",
+        "아늑해요",
+        "야외공간이 멋져요",
+        "컨셉이 독특해요",
+        "차분한 분위기에요",
+        "대화하기 좋아요",
+        "사진이 잘 나와요",
+        "음악이 좋아요",
+        "집중하기 좋아요",
+        "혼술하기 좋아요"
+    ],
+    "customer": [
+        "단체모임 하기 좋아요",
+        "혼밥하기 좋아요",
+        "반려동물과 가기 좋아요",
+        "아이와 가기 좋아요",
+        "특별한 날 가기 좋아요"
+    ],
+    "etc": [
+        "친절해요",
+        "매장이 청결해요",
+        "화장실이 깨끗해요",
+        "주차하기 편해요",
+        "룸이 잘 되어있어요",
+        "오래 머무르기 좋아요",
+        "음식이 빨리 나와요",
+        "좌석이 편해요",
+        "직접 잘 구워줘요",
+        "샐러드바가 잘 되어있어요",
+        "환기가 잘 돼요",
+        "포장이 깔끔해요"
+    ]
+}
 
 # URL
 url = 'https://m.place.naver.com/restaurant/1085956231/review/visitor?entry=ple&reviewSort=recent'
@@ -75,7 +134,6 @@ try:
     bs = BeautifulSoup(html, 'lxml')
     reviews = bs.select(naver_css['review_li'])
 
-
     # 카테고리 열기
     category_fold_btns = driver.find_elements(By.CSS_SELECTOR, naver_css['category_fold_a'])
     print("카테고리 열기 시작...")
@@ -96,6 +154,14 @@ try:
 
     content_id = 1  # content_id 초기값 설정
     reviews_list = []  # 리뷰 데이터 저장 리스트
+
+    # 카테고리 대분류를 찾는 메소드 
+    def get_category_classification(text):
+        for category, phrases in CATEGORY_CHOICE.items():
+            if text in phrases:
+                return category
+        return "Category not found"  # 일치하는 대분류가 없을 때 기본값
+
     for r in reviews:
         # content
         content = r.select_one('div.pui__vn15t2 > a.pui__xtsQN-')
@@ -112,13 +178,14 @@ try:
         # category
         category_span_elements = driver.find_elements(By.XPATH, naver_css['category_XPATH'])
         for element in category_span_elements:
-            category = element.text
+            category_text = element.text
+            category_classification = get_category_classification(category_text)
 
             review_data = {
                 "content_id": content_id,
                 "content": content,
                 "posting_time": posting_time_str,
-                "category": category
+                "category": category_classification
             }
 
             reviews_list.append(review_data)
