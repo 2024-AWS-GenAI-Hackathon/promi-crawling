@@ -4,6 +4,8 @@
 import time
 import os
 import json
+
+import boto3
 from dotenv import load_dotenv
 import pandas as pd
 from selenium import webdriver
@@ -126,6 +128,30 @@ with open('./instagram.json', 'r', encoding='utf-8') as f:
     json_data = json.load(f)
 
 print(json.dumps(json_data, ensure_ascii=False, indent=4))
+
+
+AWS_ACCESS_KEY = os.getenv('AWS_ACCESS_KEY')
+AWS_SECRET_KEY = os.getenv('AWS_SECRET_KEY')
+
+result_array = []
+
+
+### S3 업로드 작성 ###
+AWS_BUCKET_NAME = os.getenv('AWS_BUCKET_NAME')
+file_name = 'instagram'
+
+def upload_file_s3(bucket, file_name, file):
+    s3 = boto3.client('s3',aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
+    encode_file = json.dumps(file, indent=4, ensure_ascii=False)
+    try:
+        s3.put_object(Bucket=bucket, Key=file_name, Body=encode_file)
+        return True
+    except:
+        return False
+
+save = upload_file_s3(AWS_BUCKET_NAME, file_name + '.json', json_data)
+print("S3 upload success : "+str(save))
+
 
 # 드라이버 종료
 driver.quit()
