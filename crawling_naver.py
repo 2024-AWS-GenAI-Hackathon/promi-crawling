@@ -90,6 +90,13 @@ options.add_argument("disable-gpu")
 now = datetime.datetime.now()
 file_name = 'naver_review_' + now.strftime('%Y-%m-%d_%H-%M-%S') + '.json'
 
+
+content_id = 1
+reviews_list = []
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+res = driver.get(url)
+driver.implicitly_wait(30)
+
 # 날짜 형식 변환
 def time_formatter(posting_time):
     try:
@@ -101,96 +108,76 @@ def time_formatter(posting_time):
         else:
             posting_time = 'Invalid Date Format'
 
-        return posting_time
+        # datetime을 문자열로 변환하여 반환
+        return posting_time.isoformat() if isinstance(posting_time, datetime.datetime) else posting_time
 
     except ValueError as e:
         print(f"Date format error for posting_time: {posting_time} - {e}")
-        posting_time = 'Invalid Date Format'
+        return 'Invalid Date Format'
 
-        return posting_time
+# 카테고리 대분류를 찾는 메소드
+def get_category_classification(text):
+    for category, phrases in CATEGORY_CHOICE.items():
+        if text in phrases:
+            return category
+    return "Category not found"  # 일치하는 대분류가 없을 때 기본값
+
+
+
+
+##############################################################################
 
 # 크롤링 시작
 try:
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    res = driver.get(url)
-    driver.implicitly_wait(30)
-
     # 페이지 다운
-    driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
-    try:
-        for i in range(1):
-            element = driver.find_element(By.XPATH, naver_css['load_more_XPATH'])
-            driver.execute_script("arguments[0].scrollIntoView(true);", element)
-            time.sleep(1)  # 페이지가 완전히 로드되었는지 기다림
-            element.click()
-    except Exception as e:
-        print('더보기 오류' + str(e))
-    else:
-        print('더보기 작업 종료')
+    for i in range(5):
+        try:
+            more_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, 'a.fvwqf'))
+            )
+            driver.execute_script("arguments[0].click();", more_button)
+            time.sleep(3)  # 새로운 리뷰 로드 대기
+        except Exception as e:
+            print("No more pages to load:", e)
+            break
 
     print("10초 sleep...")
     time.sleep(10)
     html = driver.page_source
     bs = BeautifulSoup(html, 'lxml')
-    reviews = bs.select(naver_css['review_li'])
-
-    # 카테고리 열기
-    category_fold_btns = driver.find_elements(By.CSS_SELECTOR, naver_css['category_fold_a'])
-    print("카테고리 열기 시작...")
-    for button in category_fold_btns:
-        try:
-            # 버튼이 화면에 보이도록
-            driver.execute_script("arguments[0].scrollIntoView(true);", button)
-            time.sleep(1)
-
-            #(JavaScript로 클릭)
-            driver.execute_script("arguments[0].click();", button)
-            time.sleep(1)
-
-        except Exception as e:
-            print(f"클릭 실패: {e}")
-    print("카테고리 열기 끝")
-
-
-    content_id = 1  # content_id 초기값 설정
-    reviews_list = []  # 리뷰 데이터 저장 리스트
-
-    # 카테고리 대분류를 찾는 메소드 
-    def get_category_classification(text):
-        for category, phrases in CATEGORY_CHOICE.items():
-            if text in phrases:
-                return category
-        return "Category not found"  # 일치하는 대분류가 없을 때 기본값
+    reviews = driver.find_elements(By.CSS_SELECTOR, 'li.pui__X35jYm.EjjAW')
 
     for r in reviews:
-        # content
-        content = r.select_one('div.pui__vn15t2 > a.pui__xtsQN-')
-        content = content.text if content else ''
+        content = r.find_element(By.CSS_SELECTOR, 'div.pui__vn15t2').text.strip()
+        date = r.find_element(By.CSS_SELECTOR, 'span.pui__gfuUIT > time').text.strip()
 
-        # posting_time
-        date_elements = r.select('div.pui__QKE5Pr > span.pui__gfuUIT > time')
-        posting_time = date_elements[0] if date_elements else 'N/A'
-        posting_time = posting_time.text if posting_time else ''
-        posting_time = time_formatter(posting_time)
-        posting_time_str = posting_time.strftime('%Y-%m-%d %H:%M:%S') if isinstance(posting_time, datetime.datetime) else posting_time    # 문자열로 전환
+        # 태그 저장
+        i_tags = [tag.text.strip() for tag in r.find_elements(By.CSS_SELECTOR, 'div.pui__HLNvmI')]
+        i_tags = str(i_tags)
+        if "+" not in i_tags:  # 태그 0개, 1개일 때
+            i_tag = [tag.text.strip() for tag in r.find_elements(By.CSS_SELECTOR, 'div.pui__HLNvmI')]
+        else:  # 태그 2개 이상일 때
+            # 태그 더보기 버튼 누르기
+            tag_button = r.find_element(By.CSS_SELECTOR, 'a.pui__jhpEyP.pui__ggzZJ8')
+            driver.execute_script("arguments[0].click();", tag_button)
+            time.sleep(1)
+            # 태그 여러 개 잘라서 리스트에 저장
+            i_tag = [tag.text.strip() for tag in r.find_elements(By.CSS_SELECTOR, 'div.pui__HLNvmI span.pui__jhpEyP')]
 
-
-        # category
-        category_span_elements = driver.find_elements(By.XPATH, naver_css['category_XPATH'])
-        for element in category_span_elements:
-            category_text = element.text
-            category_classification = get_category_classification(category_text)
-
+        for tag in i_tag:
             review_data = {
                 "content_id": content_id,
                 "content": content,
-                "posting_time": posting_time_str,
-                "category": category_classification
+                "posting_time": time_formatter(date),
+                "category": get_category_classification(tag),
+                # "category_content": tag
             }
 
             reviews_list.append(review_data)
             content_id += 1
             time.sleep(0.06)
+
+
 
 
     # 데이터를 JSON 파일로 저장
