@@ -109,7 +109,7 @@ def time_formatter(posting_time):
             posting_time = 'Invalid Date Format'
 
         # datetime을 문자열로 변환하여 반환
-        return posting_time.isoformat() if isinstance(posting_time, datetime.datetime) else posting_time
+        return posting_time.strftime('%Y-%m-%d %H:%M:%S') if isinstance(posting_time, datetime.datetime) else posting_time
 
     except ValueError as e:
         print(f"Date format error for posting_time: {posting_time} - {e}")
@@ -122,7 +122,23 @@ def get_category_classification(text):
             return category
     return "Category not found"  # 일치하는 대분류가 없을 때 기본값
 
+# 카테고리 중복 삭제 메소드 
+def remove_duplicate_categories(review_data_list):
+    seen = set()  # 이미 본 category와 content를 추적할 집합
+    unique_reviews = []
+    content_id = 1 #아이디 값 초기화
 
+    for review_data in review_data_list:
+        # category와 content를 합친 튜플을 중복 체크 기준으로 사용
+        category_content = (review_data["category"], review_data["content"])
+        
+        if category_content not in seen:
+            review_data['content_id'] = content_id
+            unique_reviews.append(review_data)
+            content_id += 1 
+            seen.add(category_content)  # 해당 category와 content의 조합 중복임을 기록 
+
+    return unique_reviews
 
 
 ##############################################################################
@@ -166,27 +182,24 @@ try:
 
         for tag in i_tag:
             review_data = {
-                "content_id": content_id,
+                # "content_id": content_id,
                 "content": content,
                 "posting_time": time_formatter(date),
-                "category": get_category_classification(tag),
-                # "category_content": tag
+                "category": get_category_classification(tag),    
             }
 
             reviews_list.append(review_data)
-            content_id += 1
+            # content_id += 1
             time.sleep(0.06)
 
-
-
+    # 중복된 category 제거
+    reviews_list = remove_duplicate_categories(reviews_list)
 
     # 데이터를 JSON 파일로 저장
     with open(file_name, mode='w', encoding='utf-8') as json_file:
         json.dump(reviews_list, json_file, ensure_ascii=False, indent=4)
 
     print(f"Data saved to {file_name}")
-
-
 
 # 에러 발생 시 빈 리스트 저장
 except Exception as e:
