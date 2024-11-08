@@ -10,69 +10,65 @@ from selenium.webdriver.common.keys import Keys
 from bs4 import BeautifulSoup
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
 
-
-# url
+# URL
 url = 'https://m.place.naver.com/restaurant/1085956231/review/visitor?entry=ple&reviewSort=recent'
 
-# Webdriver headless mode setting
+# Webdriver headless mode 설정
 options = webdriver.ChromeOptions()
-# options.add_argument('headless')
+# options.add_argument('headless')  # 필요시 headless 모드 활성화
 options.add_argument('window-size=1920x1080')
 options.add_argument("disable-gpu")
 
-# New JSON file
+# 새로운 JSON 파일 이름
 now = datetime.datetime.now()
 file_name = 'naver_review_' + now.strftime('%Y-%m-%d_%H-%M-%S') + '.json'
 
-# Start crawling/scraping!
+# 크롤링 시작
 try:
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     res = driver.get(url)
     driver.implicitly_wait(30)
 
-    # Pagedown
+    # 페이지 다운
     driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
 
     try:
         for i in range(30):  # 최대 30번 반복
-            element = driver.find_element(By.XPATH,
-                                          '//*[@id="app-root"]/div/div/div/div[6]/div[2]/div[3]/div[1]/ul/li[2]/div[5]/a')
+            element = driver.find_element(By.XPATH, '//*[@id="app-root"]/div/div/div/div[6]/div[2]/div[3]/div[1]/ul/li[2]/div[5]/a')
             driver.execute_script("arguments[0].scrollIntoView(true);", element)
-            time.sleep(1)  # Wait a bit to ensure it has fully scrolled into view
+            time.sleep(1)  # 페이지가 완전히 로드되었는지 기다림
             element.click()
     except Exception as e:
         print('더보기 오류' + str(e))
     else:
-        print('더보기 버튼 눌림 작업 종료')
+        print('더보기 작업 종료')
 
     time.sleep(25)
     html = driver.page_source
     bs = BeautifulSoup(html, 'lxml')
     reviews = bs.select('li.pui__X35jYm.EjjAW')
 
-    # 카테고리 모두 열기
-    try:
-        # Wait for element to be clickable
-        category_fold_btn = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable(
-                (By.XPATH, '//*[@id="app-root"]/div/div/div/div[6]/div[2]/div[3]/div[1]/ul/li[2]/div[5]/a'))
-        )
+    # 여러 개의 category fold 버튼을 찾음
+    category_fold_btns = driver.find_elements(By.CSS_SELECTOR, 'a[data-pui-click-code="keywordmore"]')
+    # 각 버튼을 클릭하는 액션 수행
+    for button in category_fold_btns:
+        try:
+            # 버튼이 화면에 보이도록
+            driver.execute_script("arguments[0].scrollIntoView(true);", button)
+            time.sleep(1)
 
-        # Scroll into view
-        driver.execute_script("arguments[0].scrollIntoView(true);", category_fold_btn)
-        time.sleep(1)  # Ensure it's fully visible
+            #(JavaScript로 클릭)
+            driver.execute_script("arguments[0].click();", button)
+            print("카테고리 클릭 성공")
+            time.sleep(1)  
 
-        # Click the button using JavaScript to bypass overlay issues
-        driver.execute_script("arguments[0].click();", category_fold_btn)
-        print("Category fold button clicked successfully")
-    except Exception as e:
-        print(f"Error while clicking the element: {e}")
+        except Exception as e:
+            print(f"클릭 실패: {e}")
 
     content_id = 1  # content_id 초기값 설정
+    reviews_list = []  # 리뷰 데이터 저장 리스트
 
-    reviews_list = []  # List to store review data
 
     for r in reviews:
         # content
@@ -85,7 +81,7 @@ try:
         # category
         category_span_elements = r.select('span.pui__jhpEyP')
 
-        # exception handling
+        # 예외 처리
         content = content.text if content else ''
         posting_time = posting_time.text if posting_time else ''
 
@@ -102,20 +98,25 @@ try:
             print(f"Date format error for posting_time: {posting_time} - {e}")
             posting_time = 'Invalid Date Format'
 
-        # Prepare review data in dict format
+        # 카테고리 항목을 모두 가져와서 JSON에 저장
+        categories = [category.text for category in category_span_elements] if category_span_elements else ['N/A']
+
+        # 날짜를 문자열로 변환
+        posting_time_str = posting_time.strftime('%Y-%m-%d %H:%M:%S') if isinstance(posting_time, datetime.datetime) else posting_time
+
+        # 리뷰 데이터를 dict 형태로 준비
         review_data = {
             "content_id": content_id,
             "content": content,
-            "posting_time": posting_time,
-            "category": category_span_elements[0].text if category_span_elements else 'N/A'
+            "posting_time": posting_time_str,  # 날짜를 문자열로 변환하여 저장
+            "categories": categories  # 카테고리 리스트 추가
         }
 
         reviews_list.append(review_data)
-
         content_id += 1
         time.sleep(0.06)
 
-    # Save data to JSON file
+    # 데이터를 JSON 파일로 저장
     with open(file_name, mode='w', encoding='utf-8') as json_file:
         json.dump(reviews_list, json_file, ensure_ascii=False, indent=4)
 
@@ -123,7 +124,7 @@ try:
 
 except Exception as e:
     print(e)
-    # Save the file(temp) in case of error
+    # 에러 발생 시 빈 리스트 저장
     with open(file_name, mode='w', encoding='utf-8') as json_file:
-        json.dump([], json_file, ensure_ascii=False, indent=4)  # Empty list in case of error
+        json.dump([], json_file, ensure_ascii=False, indent=4)  # 빈 리스트 저장
     print(f"Error occurred. Temporary file saved: {file_name}")
