@@ -130,7 +130,7 @@ def get_category_classification(text):
 # 크롤링 시작
 try:
     # 페이지 다운
-    for i in range(5):
+    for i in range(15):
         try:
             more_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, 'a.fvwqf'))
