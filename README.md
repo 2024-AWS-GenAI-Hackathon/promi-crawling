@@ -1,1 +1,2 @@
-# instagram_crawling
+# promi-crawling
+- 맞춤형 마케팅 문구 및 이미지 생성을 위한 네이버 리뷰 데이터 크롤링
